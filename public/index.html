@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Master - Test Your Knowledge</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- PAGE 1: Name Input and Action Selection -->
+    <div id="page1" class="page active">
+        <div class="container">
+            <h1>QUIZ MASTER</h1>
+            <p class="subtitle">Welcome! Enter your name to begin</p>
+            
+            <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+            
+            <div class="action-buttons">
+                <button class="btn-primary" onclick="showCreateRoom()">
+                    <span class="btn-text">CREATE ROOM</span>
+                </button>
+                <button class="btn-secondary" onclick="showJoinRoom()">
+                    <span class="btn-text">JOIN ROOM</span>
+                </button>
+            </div>
+
+            <div id="joinRoomForm" class="hidden">
+                <p class="form-label">Enter room code:</p>
+                <input type="text" id="roomCodeInput" placeholder="6-character code" maxlength="6">
+                <button class="btn-join" onclick="joinRoom()">ENTER ROOM</button>
+            </div>
+
+            <div id="errorMsg" class="error-message hidden"></div>
+        </div>
+    </div>
+
+    <!-- PAGE 2: Waiting Room -->
+    <div id="page2" class="page">
+        <div class="container">
+            <h1>WAITING ROOM</h1>
+            
+            <div class="room-code-box">
+                <p>Room Code:</p>
+                <div class="room-code" id="roomCodeDisplay">------</div>
+                <p class="hint">Share this code with your friends</p>
+            </div>
+
+            <div class="players-section">
+                <h2>Players in Room (<span id="playerCount">0</span>)</h2>
+                <div id="playersList" class="players-list"></div>
+            </div>
+
+            <button id="startGameBtn" class="btn-start hidden" onclick="startGame()">
+                START GAME
+            </button>
+
+            <p class="waiting-message" id="waitingMessage">
+                Waiting for host to start the game...
+            </p>
+        </div>
+    </div>
+
+    <!-- PAGE 3: Game (Questions) -->
+    <div id="page3" class="page">
+        <div class="container game-container">
+            <div class="question-header">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar"></div>
+                </div>
+                <div class="question-info">
+                    <span id="questionCounter">Question 1/20</span>
+                    <span class="timer" id="timer">30</span>
+                </div>
+            </div>
+
+            <h2 class="question-text" id="questionText"></h2>
+
+            <div class="options-grid" id="optionsGrid"></div>
+
+            <div class="score-display">
+                Your Score: <span id="currentScore">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 4: Results -->
+    <div id="page4" class="page">
+        <div class="container results-container">
+            <h1>GAME RESULTS</h1>
+
+            <div class="podium">
+                <div class="podium-item second-place">
+                    <div class="medal">2nd</div>
+                    <div class="place-info" id="place2">
+                        <p class="player-name">---</p>
+                        <p class="player-score">0 points</p>
+                    </div>
+                </div>
+
+                <div class="podium-item first-place">
+                    <div class="medal">1st</div>
+                    <div class="place-info" id="place1">
+                        <p class="player-name">---</p>
+                        <p class="player-score">0 points</p>
+                    </div>
+                </div>
+
+                <div class="podium-item third-place">
+                    <div class="medal">3rd</div>
+                    <div class="place-info" id="place3">
+                        <p class="player-name">---</p>
+                        <p class="player-score">0 points</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="all-results">
+                <h3>Full Leaderboard</h3>
+                <div id="fullResultsList"></div>
+            </div>
+
+            <button class="btn-primary" onclick="location.reload()">
+                NEW GAME
+            </button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
