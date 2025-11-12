@@ -3,129 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quiz Master - Test Your Knowledge</title>
+    <title>Quiz Master</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- PAGE 1: Name Input and Action Selection -->
-    <div id="page1" class="page active">
+    <!-- loading screen -->
+    <div id="preloader" aria-live="polite" role="status">
+        <div class="spinner"></div>
+        <p data-i18n="loading">Loading...</p>
+    </div>
+
+    <!-- main page -->
+    <div class="page active" id="page1" role="main">
         <div class="container">
-            <h1>QUIZ MASTER</h1>
-            <p class="subtitle">Welcome! Enter your name to begin</p>
-            
-            <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
-            
-            <div class="action-buttons">
-                <button class="btn-primary" onclick="showCreateRoom()">
-                    <span class="btn-text">CREATE ROOM</span>
-                </button>
-                <button class="btn-secondary" onclick="showJoinRoom()">
-                    <span class="btn-text">JOIN ROOM</span>
-                </button>
+            <!-- language switcher -->
+            <div class="language-toggle mb-3">
+                <button class="lang-btn active" onclick="switchLanguage('en')" id="btn-en">EN</button>
+                <button class="lang-btn" onclick="switchLanguage('ru')" id="btn-ru">RU</button>
             </div>
-
-            <div id="joinRoomForm" class="hidden">
-                <p class="form-label">Enter room code:</p>
-                <input type="text" id="roomCodeInput" placeholder="6-character code" maxlength="6">
-                <button class="btn-join" onclick="joinRoom()">ENTER ROOM</button>
+            
+            <h1 class="text-center mb-4 main-title" data-i18n="welcome">QUIZ MASTER</h1>
+            <p class="text-center text-light mb-4" data-i18n="subtitle">Welcome! Enter your name to begin</p>
+            <div class="card bg-dark">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="playerName" placeholder="Enter your name" aria-required="true" aria-label="Player name input">
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-warning btn-lg" onclick="showCreateRoom()" aria-label="Create new room">
+                            <span data-i18n="createRoom">CREATE ROOM</span>
+                        </button>
+                        <button class="btn btn-outline-warning btn-lg" onclick="showJoinRoom()" aria-label="Join existing room">
+                            <span data-i18n="joinRoom">JOIN ROOM</span>
+                        </button>
+                    </div>
+                    <div id="joinRoomForm" class="hidden mt-3">
+                        <input type="text" class="form-control mb-2" id="roomCodeInput" placeholder="Enter room code" aria-label="Room code input">
+                        <button class="btn btn-warning w-100" onclick="joinRoom()" aria-label="Join room with code">
+                            <span data-i18n="join">Join</span>
+                        </button>
+                    </div>
+                    <div id="errorMsg" class="alert alert-danger mt-3 hidden" role="alert" aria-live="assertive"></div>
+                </div>
             </div>
-
-            <div id="errorMsg" class="error-message hidden"></div>
         </div>
     </div>
 
-    <!-- PAGE 2: Waiting Room -->
-    <div id="page2" class="page">
+    <!-- waiting room -->
+    <div class="page" id="page2" role="main">
         <div class="container">
-            <h1>WAITING ROOM</h1>
-            
-            <div class="room-code-box">
-                <p>Room Code:</p>
-                <div class="room-code" id="roomCodeDisplay">------</div>
-                <p class="hint">Share this code with your friends</p>
-            </div>
-
-            <div class="players-section">
-                <h2>Players in Room (<span id="playerCount">0</span>)</h2>
-                <div id="playersList" class="players-list"></div>
-            </div>
-
-            <button id="startGameBtn" class="btn-start hidden" onclick="startGame()">
-                START GAME
-            </button>
-
-            <p class="waiting-message" id="waitingMessage">
-                Waiting for host to start the game...
-            </p>
-        </div>
-    </div>
-
-    <!-- PAGE 3: Game (Questions) -->
-    <div id="page3" class="page">
-        <div class="container game-container">
-            <div class="question-header">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressBar"></div>
+            <div class="card bg-dark">
+                <div class="card-body">
+                    <h2 class="text-center mb-3" data-i18n="waitingRoom">Waiting Room</h2>
+                    <div class="alert alert-info text-center">
+                        <span data-i18n="roomCode">Room Code:</span> <strong id="roomCode" class="fs-4"></strong>
+                    </div>
+                    <h4 data-i18n="players">Players:</h4>
+                    <ul class="list-group mb-3" id="playersList" aria-live="polite"></ul>
+                    <div id="hostControls" class="d-grid">
+                        <button class="btn btn-warning btn-lg" onclick="startGame()" aria-label="Start the game">
+                            <span data-i18n="startGame">Start Game</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="question-info">
-                    <span id="questionCounter">Question 1/20</span>
-                    <span class="timer" id="timer">30</span>
-                </div>
-            </div>
-
-            <h2 class="question-text" id="questionText"></h2>
-
-            <div class="options-grid" id="optionsGrid"></div>
-
-            <div class="score-display">
-                Your Score: <span id="currentScore">0</span>
             </div>
         </div>
     </div>
 
-    <!-- PAGE 4: Results -->
-    <div id="page4" class="page">
-        <div class="container results-container">
-            <h1>GAME RESULTS</h1>
-
-            <div class="podium">
-                <div class="podium-item second-place">
-                    <div class="medal">2nd</div>
-                    <div class="place-info" id="place2">
-                        <p class="player-name">---</p>
-                        <p class="player-score">0 points</p>
+    <!-- game page -->
+    <div class="page" id="page3" role="main">
+        <div class="container">
+            <div class="card bg-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <span data-i18n="question">Question</span> <span id="questionNumber"></span>/<span id="totalQuestions"></span>
+                        </div>
+                        <div class="timer" id="timer" aria-live="polite" aria-atomic="true">15</div>
                     </div>
-                </div>
-
-                <div class="podium-item first-place">
-                    <div class="medal">1st</div>
-                    <div class="place-info" id="place1">
-                        <p class="player-name">---</p>
-                        <p class="player-score">0 points</p>
+                    <div class="progress mb-3" style="height: 8px;" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar bg-warning" id="progressBar" style="width: 0%"></div>
                     </div>
-                </div>
-
-                <div class="podium-item third-place">
-                    <div class="medal">3rd</div>
-                    <div class="place-info" id="place3">
-                        <p class="player-name">---</p>
-                        <p class="player-score">0 points</p>
+                    <h3 class="mb-4" id="questionText"></h3>
+                    <div class="row g-2" id="optionsContainer"></div>
+                    <div class="mt-3">
+                        <p><span data-i18n="yourScore">Your Score:</span> <strong id="myScore">0</strong></p>
                     </div>
                 </div>
             </div>
-
-            <div class="all-results">
-                <h3>Full Leaderboard</h3>
-                <div id="fullResultsList"></div>
-            </div>
-
-            <button class="btn-primary" onclick="location.reload()">
-                NEW GAME
-            </button>
         </div>
     </div>
 
+    <!-- results page -->
+    <div class="page" id="page4" role="main">
+        <div class="container">
+            <div class="card bg-dark">
+                <div class="card-body">
+                    <h2 class="text-center mb-4" data-i18n="gameOver">Game Over!</h2>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-striped">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="rank">Rank</th>
+                                    <th data-i18n="player">Player</th>
+                                    <th data-i18n="score">Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTable"></tbody>
+                        </table>
+                    </div>
+                    <div class="d-grid">
+                        <button class="btn btn-warning btn-lg" onclick="location.reload()" aria-label="Play again">
+                            <span data-i18n="playAgain">Play Again</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="translations.js"></script>
     <script src="client.js"></script>
 </body>
 </html>
