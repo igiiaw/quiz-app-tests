@@ -1,59 +1,59 @@
 const socket = io();
-
 let currentRoom = null;
 let playerName = null;
 let isHost = false;
 let questionStartTime = null;
 let timerInterval = null;
 let myScore = 0;
+let currentLang = 'en';
+let answerSubmitted = false;
+
+$(document).ready(function() {
+    // hide loading screen after 1 sec
+    setTimeout(() => {
+        $('#preloader').addClass('hidden');
+    }, 1000);
+    
+    loadLanguage();
+});
 
 function showPage(pageNumber) {
-    document.querySelectorAll('.page').forEach(page => {
-        page.classList.remove('active');
-    });
-    document.getElementById(`page${pageNumber}`).classList.add('active');
+    $('.page').removeClass('active');
+    $(`#page${pageNumber}`).addClass('active');
 }
 
 function showError(message) {
-    const errorMsg = document.getElementById('errorMsg');
-    errorMsg.textContent = message;
-    errorMsg.classList.remove('hidden');
+    $('#errorMsg').text(message).removeClass('hidden');
     setTimeout(() => {
-        errorMsg.classList.add('hidden');
+        $('#errorMsg').addClass('hidden');
     }, 3000);
 }
 
 function showCreateRoom() {
-    const nameInput = document.getElementById('playerName');
-    playerName = nameInput.value.trim();
-    
+    playerName = $('#playerName').val().trim();
     if (!playerName) {
-        showError('Please enter your name');
+        showError(translations[currentLang].enterNameError);
         return;
     }
-    
     isHost = true;
     socket.emit('createRoom', playerName);
 }
 
 function showJoinRoom() {
-    document.getElementById('joinRoomForm').classList.remove('hidden');
+    $('#joinRoomForm').removeClass('hidden');
 }
 
 function joinRoom() {
-    const nameInput = document.getElementById('playerName');
-    const codeInput = document.getElementById('roomCodeInput');
-    
-    playerName = nameInput.value.trim();
-    const roomCode = codeInput.value.trim().toUpperCase();
+    playerName = $('#playerName').val().trim();
+    const roomCode = $('#roomCodeInput').val().trim();
     
     if (!playerName) {
-        showError('Enter your name');
+        showError(translations[currentLang].enterNameError);
         return;
     }
     
-    if (!roomCode || roomCode.length !== 6) {
-        showError('Enter valid room code (6 characters)');
+    if (!roomCode) {
+        showError(translations[currentLang].enterRoomCodeError);
         return;
     }
     
@@ -64,178 +64,141 @@ function startGame() {
     socket.emit('startGame', currentRoom);
 }
 
-function selectOption(index) {
-    const options = document.querySelectorAll('.option');
+function selectAnswer(optionIndex) {
+    if (answerSubmitted) return;
     
-    if (options[0].classList.contains('disabled')) {
-        return;
-    }
-    
-    options.forEach(opt => {
-        opt.classList.add('disabled');
-        opt.classList.remove('selected');
-    });
-    
-    options[index].classList.add('selected');
-    
-    const timeElapsed = Date.now() - questionStartTime;
+    answerSubmitted = true;
+    const timeSpent = Date.now() - questionStartTime;
     socket.emit('submitAnswer', {
-        roomCode: currentRoom,
-        answerIndex: index,
-        timeElapsed
+        room: currentRoom,
+        answer: optionIndex,
+        timeSpent: timeSpent
     });
+    
+    $('.option-btn').prop('disabled', true);
 }
 
-function startQuestionTimer() {
-    let timeLeft = 30;
-    const timerEl = document.getElementById('timer');
-    timerEl.classList.remove('warning');
-    
-    clearInterval(timerInterval);
-    
-    timerInterval = setInterval(() => {
-        timeLeft--;
-        timerEl.textContent = timeLeft;
-        
-        if (timeLeft <= 10) {
-            timerEl.classList.add('warning');
-        }
-        
-        if (timeLeft <= 0) {
-            clearInterval(timerInterval);
-            document.querySelectorAll('.option').forEach(opt => {
-                opt.classList.add('disabled');
-            });
-        }
-    }, 1000);
+function updateTimer(seconds) {
+    $('#timer').text(seconds);
+    if (seconds <= 5) {
+        $('#timer').addClass('warning');
+    } else {
+        $('#timer').removeClass('warning');
+    }
 }
 
-socket.on('roomCreated', ({ roomCode }) => {
-    currentRoom = roomCode;
-    document.getElementById('roomCodeDisplay').textContent = roomCode;
-    document.getElementById('startGameBtn').classList.remove('hidden');
-    document.getElementById('waitingMessage').classList.add('hidden');
+// room created by host
+socket.on('roomCreated', (data) => {
+    currentRoom = data.roomCode;
+    $('#roomCode').text(data.roomCode);
     showPage(2);
+    updatePlayersList(data.players);
+    if (isHost) {
+        $('#hostControls').show();
+    }
 });
 
-socket.on('roomJoined', ({ roomCode }) => {
-    currentRoom = roomCode;
-    document.getElementById('roomCodeDisplay').textContent = roomCode;
+// player joined room
+socket.on('roomJoined', (data) => {
+    currentRoom = data.roomCode;
+    $('#roomCode').text(data.roomCode);
     showPage(2);
+    updatePlayersList(data.players);
+    $('#hostControls').hide();
 });
 
-socket.on('playersUpdate', (players) => {
-    const playersList = document.getElementById('playersList');
-    const playerCount = document.getElementById('playerCount');
-    
-    playerCount.textContent = players.length;
-    playersList.innerHTML = '';
-    
+socket.on('updatePlayers', (players) => {
+    updatePlayersList(players);
+});
+
+function updatePlayersList(players) {
+    const list = $('#playersList');
+    list.empty();
     players.forEach(player => {
-        const card = document.createElement('div');
-        card.className = 'player-card';
-        if (player.isHost) {
-            card.classList.add('host');
-        }
-        
-        card.innerHTML = `
-            <span>${player.name}</span>
-        `;
-        
-        playersList.appendChild(card);
+        list.append(`<li class="list-group-item">${player.name}</li>`);
     });
+}
+
+// game started
+socket.on('gameStarted', (data) => {
+    showPage(3);
+    $('#totalQuestions').text(data.totalQuestions);
 });
 
-socket.on('gameStarted', () => {
-    showPage(3);
-});
-
-socket.on('question', (data) => {
-    showPage(3);
+// new question received
+socket.on('newQuestion', (data) => {
+    answerSubmitted = false;
+    questionStartTime = Date.now();
+    $('#questionNumber').text(data.questionNumber);
+    $('#questionText').text(data.question);
     
-    const progress = (data.questionNumber / data.totalQuestions) * 100;
-    document.getElementById('progressBar').style.width = progress + '%';
-    
-    document.getElementById('questionCounter').textContent = 
-        `Question ${data.questionNumber}/${data.totalQuestions}`;
-    
-    document.getElementById('questionText').textContent = data.question;
-    
-    const optionsGrid = document.getElementById('optionsGrid');
-    optionsGrid.innerHTML = '';
+    // create option buttons
+    const optionsContainer = $('#optionsContainer');
+    optionsContainer.empty();
     
     data.options.forEach((option, index) => {
-        const div = document.createElement('div');
-        div.className = 'option';
-        div.textContent = option;
-        div.onclick = () => selectOption(index);
-        optionsGrid.appendChild(div);
+        optionsContainer.append(`
+            <div class="col-md-6">
+                <button class="option-btn" onclick="selectAnswer(${index})" aria-label="Option ${index + 1}">
+                    ${option}
+                </button>
+            </div>
+        `);
     });
     
-    document.getElementById('currentScore').textContent = myScore;
+    // start countdown
+    let timeLeft = 15;
+    updateTimer(timeLeft);
     
-    questionStartTime = Date.now();
-    document.getElementById('timer').textContent = '30';
-    startQuestionTimer();
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimer(timeLeft);
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+        }
+    }, 1000);
+    
+    // update progress bar
+    const progress = (data.questionNumber / data.totalQuestions) * 100;
+    $('#progressBar').css('width', progress + '%').attr('aria-valuenow', progress);
 });
 
-socket.on('showCorrectAnswer', (data) => {
+// answer result received
+socket.on('answerResult', (data) => {
     clearInterval(timerInterval);
     
-    const options = document.querySelectorAll('.option');
-    options.forEach((opt, index) => {
-        opt.classList.add('disabled');
-        
+    // show correct/wrong answers
+    $('.option-btn').each(function(index) {
+        $(this).prop('disabled', true);
         if (index === data.correctAnswer) {
-            opt.classList.add('correct');
-        } else if (opt.classList.contains('selected')) {
-            opt.classList.add('incorrect');
+            $(this).addClass('correct');
+        } else if (index === data.playerAnswer && data.playerAnswer !== -1 && !data.correct) {
+            $(this).addClass('wrong');
         }
     });
     
-    if (options[data.correctAnswer].classList.contains('selected')) {
-        const timeElapsed = Date.now() - questionStartTime;
-        const maxTime = 30000;
-        const timeBonus = Math.max(0, maxTime - timeElapsed);
-        const points = Math.floor(500 + (timeBonus / maxTime) * 500);
-        myScore += points;
-        document.getElementById('currentScore').textContent = myScore;
+    // update score
+    if (data.correct) {
+        myScore += data.points;
+        $('#myScore').text(myScore);
     }
 });
 
-socket.on('gameEnd', (results) => {
-    clearInterval(timerInterval);
+// game ended
+socket.on('gameEnded', (results) => {
     showPage(4);
-    
-    const places = ['place1', 'place2', 'place3'];
-    results.slice(0, 3).forEach((player, index) => {
-        const placeEl = document.getElementById(places[index]);
-        placeEl.querySelector('.player-name').textContent = player.name;
-        placeEl.querySelector('.player-score').textContent = `${player.score} points`;
-    });
-    
-    for (let i = results.length; i < 3; i++) {
-        const placeEl = document.getElementById(places[i]);
-        placeEl.querySelector('.player-name').textContent = '---';
-        placeEl.querySelector('.player-score').textContent = '0 points';
-    }
-    
-    const fullResultsList = document.getElementById('fullResultsList');
-    fullResultsList.innerHTML = '';
+    const tbody = $('#resultsTable');
+    tbody.empty();
     
     results.forEach((player, index) => {
-        const div = document.createElement('div');
-        div.className = 'result-item';
-        if (index < 3) {
-            div.classList.add('top-three');
-        }
-        
-        div.innerHTML = `
-            <span>${index + 1}. ${player.name}</span>
-            <span>${player.score} points</span>
-        `;
-        
-        fullResultsList.appendChild(div);
+        tbody.append(`
+            <tr>
+                <td>${index + 1}</td>
+                <td>${player.name}</td>
+                <td>${player.score}</td>
+            </tr>
+        `);
     });
 });
 
@@ -243,7 +206,30 @@ socket.on('error', (message) => {
     showError(message);
 });
 
-socket.on('hostLeft', () => {
-    alert('Host left the game. Room closed.');
-    location.reload();
-});
+// language switching
+function switchLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('language', lang);
+    
+    $('.lang-btn').removeClass('active');
+    $(`#btn-${lang}`).addClass('active');
+    
+    loadLanguage();
+}
+
+function loadLanguage() {
+    const savedLang = localStorage.getItem('language');
+    if (savedLang) {
+        currentLang = savedLang;
+        $('.lang-btn').removeClass('active');
+        $(`#btn-${savedLang}`).addClass('active');
+    }
+    
+    // apply translations
+    $('[data-i18n]').each(function() {
+        const key = $(this).data('i18n');
+        if (translations[currentLang] && translations[currentLang][key]) {
+            $(this).text(translations[currentLang][key]);
+        }
+    });
+}
