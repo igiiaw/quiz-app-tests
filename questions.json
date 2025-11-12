@@ -1,0 +1,52 @@
+[
+    {
+        "question": "What is the capital of France?",
+        "options": ["London", "Paris", "Berlin", "Madrid"],
+        "correct": 1
+    },
+    {
+        "question": "How many planets are in the Solar System?",
+        "options": ["7", "8", "9", "10"],
+        "correct": 1
+    },
+    {
+        "question": "Who wrote 'War and Peace'?",
+        "options": ["Dostoevsky", "Tolstoy", "Chekhov", "Pushkin"],
+        "correct": 1
+    },
+    {
+        "question": "Which element has the symbol 'O'?",
+        "options": ["Gold", "Oxygen", "Osmium", "Tin"],
+        "correct": 1
+    },
+    {
+        "question": "In what year was the October Revolution?",
+        "options": ["1905", "1914", "1917", "1922"],
+        "correct": 2
+    },
+    {
+        "question": "What is the largest planet in the Solar System?",
+        "options": ["Earth", "Saturn", "Jupiter", "Uranus"],
+        "correct": 2
+    },
+    {
+        "question": "How many continents are there on Earth?",
+        "options": ["5", "6", "7", "8"],
+        "correct": 2
+    },
+    {
+        "question": "Who painted the Mona Lisa?",
+        "options": ["Van Gogh", "Picasso", "Da Vinci", "Michelangelo"],
+        "correct": 2
+    },
+    {
+        "question": "What is the speed of light?",
+        "options": ["300,000 km/s", "150,000 km/s", "450,000 km/s", "600,000 km/s"],
+        "correct": 0
+    },
+    {
+        "question": "Which ocean is the largest?",
+        "options": ["Pacific", "Atlantic", "Indian", "Arctic"],
+        "correct": 0
+    }
+]
