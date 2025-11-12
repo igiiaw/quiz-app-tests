@@ -2,142 +2,54 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
+const fs = require('fs');
+const path = require('path');
 
 app.use(express.static('public'));
 
 const rooms = new Map();
+let questions = [];
 
-const questions = [
-    {
-        question: "What is the capital of France?",
-        options: ["London", "Paris", "Berlin", "Madrid"],
-        correct: 1
-    },
-    {
-        question: "How many planets are in the Solar System?",
-        options: ["7", "8", "9", "10"],
-        correct: 1
-    },
-    {
-        question: "Who wrote 'War and Peace'?",
-        options: ["Dostoevsky", "Tolstoy", "Chekhov", "Pushkin"],
-        correct: 1
-    },
-    {
-        question: "Which element has the symbol 'O'?",
-        options: ["Gold", "Oxygen", "Osmium", "Tin"],
-        correct: 1
-    },
-    {
-        question: "In what year was the October Revolution?",
-        options: ["1905", "1914", "1917", "1922"],
-        correct: 2
-    },
-    {
-        question: "What is the largest planet in the Solar System?",
-        options: ["Earth", "Saturn", "Jupiter", "Uranus"],
-        correct: 2
-    },
-    {
-        question: "How many continents are there on Earth?",
-        options: ["5", "6", "7", "8"],
-        correct: 2
-    },
-    {
-        question: "Which ocean is the largest?",
-        options: ["Atlantic", "Indian", "Pacific", "Arctic"],
-        correct: 2
-    },
-    {
-        question: "Who invented the light bulb?",
-        options: ["Nikola Tesla", "Thomas Edison", "Alexander Bell", "Benjamin Franklin"],
-        correct: 1
-    },
-    {
-        question: "Which country gifted the Statue of Liberty to the USA?",
-        options: ["England", "Germany", "France", "Spain"],
-        correct: 2
-    },
-    {
-        question: "How many days are in a leap year?",
-        options: ["365", "366", "364", "367"],
-        correct: 1
-    },
-    {
-        question: "Which gas is essential for breathing?",
-        options: ["Nitrogen", "Oxygen", "Carbon Dioxide", "Hydrogen"],
-        correct: 1
-    },
-    {
-        question: "What is the longest river in the world?",
-        options: ["Nile", "Amazon", "Yangtze", "Mississippi"],
-        correct: 0
-    },
-    {
-        question: "How many strings does a standard guitar have?",
-        options: ["4", "5", "6", "7"],
-        correct: 2
-    },
-    {
-        question: "What is the highest mountain in the world?",
-        options: ["K2", "Everest", "Kangchenjunga", "Kilimanjaro"],
-        correct: 1
-    },
-    {
-        question: "In what year did World War II begin?",
-        options: ["1937", "1939", "1941", "1945"],
-        correct: 1
-    },
-    {
-        question: "What is the lightest metal?",
-        options: ["Aluminum", "Lithium", "Magnesium", "Titanium"],
-        correct: 1
-    },
-    {
-        question: "How many colors are in a rainbow?",
-        options: ["5", "6", "7", "8"],
-        correct: 2
-    },
-    {
-        question: "Which planet is known as the Red Planet?",
-        options: ["Venus", "Mars", "Jupiter", "Saturn"],
-        correct: 1
-    },
-    {
-        question: "How many bones are in the adult human body?",
-        options: ["186", "206", "226", "246"],
-        correct: 1
+// load questions from json file
+fs.readFile(path.join(__dirname, 'questions.json'), 'utf8', (err, data) => {
+    if (err) {
+        console.error('Error loading questions:', err);
+        return;
     }
-];
+    questions = JSON.parse(data);
+    console.log(`Loaded ${questions.length} questions`);
+});
+
+function generateRoomCode() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
 
 io.on('connection', (socket) => {
-    console.log('Connected:', socket.id);
+    console.log('User connected:', socket.id);
 
+    // create new room
     socket.on('createRoom', (playerName) => {
         const roomCode = generateRoomCode();
         const room = {
             code: roomCode,
             host: socket.id,
-            players: new Map(),
-            started: false,
+            players: [{ id: socket.id, name: playerName, score: 0 }],
+            gameStarted: false,
             currentQuestion: 0,
-            questionStartTime: null,
-            answers: new Map()
+            answers: new Map(),
+            questionTimeout: null
         };
         
-        room.players.set(socket.id, {
-            id: socket.id,
-            name: playerName,
-            score: 0,
-            isHost: true
-        });
-
         rooms.set(roomCode, room);
         socket.join(roomCode);
-        socket.emit('roomCreated', { roomCode, playerName });
-        updateRoomPlayers(roomCode);
+        
+        socket.emit('roomCreated', {
+            roomCode: roomCode,
+            players: room.players
+        });
     });
 
+    // join existing room
     socket.on('joinRoom', ({ roomCode, playerName }) => {
         const room = rooms.get(roomCode);
         
@@ -145,171 +57,188 @@ io.on('connection', (socket) => {
             socket.emit('error', 'Room not found');
             return;
         }
-
-        if (room.started) {
+        
+        if (room.gameStarted) {
             socket.emit('error', 'Game already started');
             return;
         }
-
-        room.players.set(socket.id, {
-            id: socket.id,
-            name: playerName,
-            score: 0,
-            isHost: false
-        });
-
+        
+        room.players.push({ id: socket.id, name: playerName, score: 0 });
         socket.join(roomCode);
-        socket.emit('roomJoined', { roomCode, playerName });
-        updateRoomPlayers(roomCode);
+        
+        socket.emit('roomJoined', {
+            roomCode: roomCode,
+            players: room.players
+        });
+        
+        io.to(roomCode).emit('updatePlayers', room.players);
     });
 
+    // start game
     socket.on('startGame', (roomCode) => {
         const room = rooms.get(roomCode);
         
         if (!room || room.host !== socket.id) {
             return;
         }
-
-        if (room.players.size < 2) {
-            socket.emit('error', 'Need at least 2 players');
-            return;
-        }
-
-        room.started = true;
+        
+        room.gameStarted = true;
         room.currentQuestion = 0;
-        io.to(roomCode).emit('gameStarted');
         
-        setTimeout(() => {
-            sendQuestion(roomCode);
-        }, 1000);
-    });
-
-    socket.on('submitAnswer', ({ roomCode, answerIndex, timeElapsed }) => {
-        const room = rooms.get(roomCode);
-        
-        if (!room || !room.started) {
-            return;
-        }
-
-        const player = room.players.get(socket.id);
-        if (!player || room.answers.has(socket.id)) {
-            return;
-        }
-
-        const currentQ = questions[room.currentQuestion];
-        const isCorrect = answerIndex === currentQ.correct;
-        
-        let points = 0;
-        if (isCorrect) {
-            const maxTime = 30000;
-            const timeBonus = Math.max(0, maxTime - timeElapsed);
-            points = Math.floor(500 + (timeBonus / maxTime) * 500);
-        }
-
-        player.score += points;
-        room.answers.set(socket.id, {
-            answerIndex,
-            isCorrect,
-            points,
-            timeElapsed
+        io.to(roomCode).emit('gameStarted', {
+            totalQuestions: questions.length
         });
+        
+        setTimeout(() => sendQuestion(roomCode), 1000);
+    });
 
-        if (room.answers.size === room.players.size) {
+    // player submitted answer
+    socket.on('submitAnswer', ({ room: roomCode, answer, timeSpent }) => {
+        const room = rooms.get(roomCode);
+        if (!room) return;
+        
+        if (!room.answers.has(room.currentQuestion)) {
+            room.answers.set(room.currentQuestion, new Map());
+        }
+        
+        // prevent double submission
+        if (room.answers.get(room.currentQuestion).has(socket.id)) {
+            return;
+        }
+        
+        const currentQ = questions[room.currentQuestion];
+        const correct = answer === currentQ.correct;
+        
+        // calculate points
+        let points = 0;
+        if (correct && answer !== -1) {
+            const timeBonus = Math.max(0, 15 - Math.floor(timeSpent / 1000));
+            points = 10 + timeBonus;
+            
+            const player = room.players.find(p => p.id === socket.id);
+            if (player) {
+                player.score += points;
+            }
+        }
+        
+        socket.emit('answerResult', {
+            correct: correct,
+            correctAnswer: currentQ.correct,
+            playerAnswer: answer,
+            points: points
+        });
+        
+        room.answers.get(room.currentQuestion).set(socket.id, answer);
+        
+        // all players answered, move to next question
+        if (room.answers.get(room.currentQuestion).size === room.players.length) {
+            if (room.questionTimeout) {
+                clearTimeout(room.questionTimeout);
+            }
+            
             setTimeout(() => {
-                nextQuestion(roomCode);
-            }, 2000);
+                room.currentQuestion++;
+                if (room.currentQuestion < questions.length) {
+                    sendQuestion(roomCode);
+                } else {
+                    endGame(roomCode);
+                }
+            }, 3000);
         }
     });
 
+    // player disconnected
     socket.on('disconnect', () => {
-        console.log('Disconnected:', socket.id);
+        console.log('User disconnected:', socket.id);
         
-        rooms.forEach((room, roomCode) => {
-            if (room.players.has(socket.id)) {
-                room.players.delete(socket.id);
+        rooms.forEach((room, code) => {
+            const playerIndex = room.players.findIndex(p => p.id === socket.id);
+            if (playerIndex !== -1) {
+                room.players.splice(playerIndex, 1);
                 
-                if (room.host === socket.id) {
-                    io.to(roomCode).emit('hostLeft');
-                    rooms.delete(roomCode);
+                if (room.players.length === 0) {
+                    if (room.questionTimeout) {
+                        clearTimeout(room.questionTimeout);
+                    }
+                    rooms.delete(code);
                 } else {
-                    updateRoomPlayers(roomCode);
+                    if (room.host === socket.id) {
+                        room.host = room.players[0].id;
+                    }
+                    io.to(code).emit('updatePlayers', room.players);
                 }
             }
         });
     });
 });
 
-function generateRoomCode() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
-function updateRoomPlayers(roomCode) {
-    const room = rooms.get(roomCode);
-    if (!room) return;
-
-    const playerList = Array.from(room.players.values());
-    io.to(roomCode).emit('playersUpdate', playerList);
-}
-
 function sendQuestion(roomCode) {
     const room = rooms.get(roomCode);
     if (!room) return;
-
+    
     const question = questions[room.currentQuestion];
-    room.questionStartTime = Date.now();
-    room.answers.clear();
-
-    io.to(roomCode).emit('question', {
+    
+    io.to(roomCode).emit('newQuestion', {
         questionNumber: room.currentQuestion + 1,
         totalQuestions: questions.length,
         question: question.question,
         options: question.options
     });
-
-    setTimeout(() => {
-        if (room.started && room.answers.size < room.players.size) {
-            nextQuestion(roomCode);
-        }
-    }, 30000);
-}
-
-function nextQuestion(roomCode) {
-    const room = rooms.get(roomCode);
-    if (!room) return;
-
-    const currentQ = questions[room.currentQuestion];
     
-    io.to(roomCode).emit('showCorrectAnswer', {
-        correctAnswer: currentQ.correct,
-        correctText: currentQ.options[currentQ.correct]
-    });
-
-    setTimeout(() => {
-        room.currentQuestion++;
-
-        if (room.currentQuestion < questions.length) {
-            sendQuestion(roomCode);
-        } else {
-            endGame(roomCode);
-        }
-    }, 3000);
+    // timeout if no one answers
+    room.questionTimeout = setTimeout(() => {
+        room.players.forEach(player => {
+            if (!room.answers.has(room.currentQuestion) || 
+                !room.answers.get(room.currentQuestion).has(player.id)) {
+                
+                const currentQ = questions[room.currentQuestion];
+                io.to(player.id).emit('answerResult', {
+                    correct: false,
+                    correctAnswer: currentQ.correct,
+                    playerAnswer: -1,
+                    points: 0
+                });
+                
+                if (!room.answers.has(room.currentQuestion)) {
+                    room.answers.set(room.currentQuestion, new Map());
+                }
+                room.answers.get(room.currentQuestion).set(player.id, -1);
+            }
+        });
+        
+        setTimeout(() => {
+            room.currentQuestion++;
+            if (room.currentQuestion < questions.length) {
+                sendQuestion(roomCode);
+            } else {
+                endGame(roomCode);
+            }
+        }, 3000);
+    }, 15000);
 }
 
 function endGame(roomCode) {
     const room = rooms.get(roomCode);
     if (!room) return;
-
-    const finalResults = Array.from(room.players.values())
-        .map(player => ({
-            name: player.name,
-            score: player.score
-        }))
-        .sort((a, b) => b.score - a.score);
-
-    io.to(roomCode).emit('gameEnd', finalResults);
+    
+    if (room.questionTimeout) {
+        clearTimeout(room.questionTimeout);
+    }
+    
+    // sort players by score
+    const results = room.players
+        .sort((a, b) => b.score - a.score)
+        .map(p => ({ name: p.name, score: p.score }));
+    
+    io.to(roomCode).emit('gameEnded', results);
+    
+    // delete room after 1 minute
+    setTimeout(() => {
+        rooms.delete(roomCode);
+    }, 60000);
 }
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
